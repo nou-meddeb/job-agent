@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Agent d'analyse d'offres d'emploi</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f3; color: #1a1a18; min-height: 100vh; display: flex; justify-content: center; padding: 2rem 1rem; }
+    .container { width: 100%; max-width: 680px; }
+    h1 { font-size: 22px; font-weight: 500; margin-bottom: 4px; }
+    .subtitle { font-size: 14px; color: #5f5e5a; margin-bottom: 2rem; }
+    .step-indicator { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .step-pill { font-size: 12px; padding: 4px 12px; border-radius: 20px; border: 0.5px solid #d3d1c7; color: #5f5e5a; background: #f1efe8; }
+    .step-pill.active { background: #eeedfe; color: #3c3489; border-color: #afa9ec; }
+    .step-pill.done { background: #e1f5ee; color: #085041; border-color: #5dcaa5; }
+    .card { background: #fff; border: 0.5px solid #d3d1c7; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+    .card-label { font-size: 13px; color: #5f5e5a; margin-bottom: 8px; }
+    textarea { width: 100%; min-height: 140px; font-size: 14px; padding: 10px 12px; border-radius: 8px; border: 0.5px solid #b4b2a9; background: #f9f9f7; color: #1a1a18; resize: vertical; font-family: inherit; line-height: 1.6; }
+    textarea:focus { outline: none; border-color: #7f77dd; box-shadow: 0 0 0 2px #eeedfe; }
+    .char-count { font-size: 11px; color: #888780; text-align: right; margin-top: 4px; }
+    .privacy-note { display: flex; align-items: flex-start; gap: 8px; background: #faeeda; border: 0.5px solid #ef9f27; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
+    .privacy-note p { font-size: 12px; color: #633806; line-height: 1.6; }
+    .privacy-list { margin: 4px 0 0; padding-left: 16px; }
+    .privacy-list li { margin-bottom: 2px; }
+    .error-box { background: #fcebeb; border: 0.5px solid #f09595; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 13px; color: #791f1f; display: none; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; padding: 9px 20px; border-radius: 8px; border: 0.5px solid #b4b2a9; background: transparent; color: #1a1a18; cursor: pointer; transition: background 0.15s; }
+    .btn:hover { background: #f1efe8; }
+    .btn.primary { background: #534ab7; color: #fff; border-color: #534ab7; }
+    .btn.primary:hover { background: #3c3489; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .success-card { background: #e1f5ee; border: 0.5px solid #5dcaa5; border-radius: 12px; padding: 12px 16px; margin-bottom: 1rem; font-size: 13px; color: #085041; }
+    .loading { text-align: center; padding: 3rem 0; display: none; }
+    .loading-dots { display: inline-flex; gap: 5px; }
+    .loading-dots span { width: 7px; height: 7px; border-radius: 50%; background: #7f77dd; animation: bounce 1s infinite; }
+    .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bounce { 0%,80%,100%{transform:scale(0.7);opacity:0.5} 40%{transform:scale(1);opacity:1} }
+    .loading p { font-size: 14px; color: #5f5e5a; margin-top: 12px; }
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+    .metric { background: #f1efe8; border-radius: 8px; padding: 14px; text-align: center; }
+    .metric-val { font-size: 24px; font-weight: 500; }
+    .metric-lbl { font-size: 12px; color: #5f5e5a; margin-top: 3px; }
+    .score-bar-wrap { background: #f1efe8; border-radius: 20px; height: 8px; overflow: hidden; margin: 8px 0 6px; }
+    .score-bar { height: 8px; border-radius: 20px; transition: width 1s ease; }
+    .tag { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 20px; margin: 3px; }
+    .tag.green { background: #e1f5ee; color: #085041; }
+    .tag.amber { background: #faeeda; color: #633806; }
+    .tag.purple { background: #eeedfe; color: #3c3489; }
+    .section-title { font-size: 13px; font-weight: 500; margin: 14px 0 6px; }
+    .gap-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 0.5px solid #e8e6e0; font-size: 13px; gap: 8px; }
+    .gap-row:last-child { border-bottom: none; }
+    .gap-label { color: #5f5e5a; flex: 1; }
+    .angle-text { font-size: 13px; color: #5f5e5a; line-height: 1.6; margin: 0; }
+    footer { margin-top: 2rem; font-size: 12px; color: #888780; text-align: center; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Agent d'analyse d'offres d'emploi</h1>
+  <p class="subtitle">Comparez vos offres d'emploi avec votre profil professionnel.</p>
+
+  <div class="step-indicator">
+    <span class="step-pill active" id="pill-0">Étape 0 — Profil</span>
+    <span class="step-pill" id="pill-1">Étape 4 — Analyse</span>
+    <span class="step-pill" id="pill-2">Résultat</span>
+  </div>
+
+  <!-- STEP CV -->
+  <div id="step-cv">
+    <div class="card">
+      <div class="card-label">Votre profil professionnel</div>
+      <textarea id="cv-input" placeholder="Décrivez votre profil : expérience, compétences, formations, langues, ambitions de carrière..." oninput="updateCount('cv-input','cv-count')"></textarea>
+      <div class="char-count" id="cv-count">0 caractères</div>
+      <div class="privacy-note">
+        <p>
+          <strong>Confidentialité</strong> — ne partagez pas d'informations personnelles sensibles :
+          <ul class="privacy-list">
+            <li>Pas de nom complet, adresse, téléphone ou email</li>
+            <li>Pas de numéro de sécurité sociale ou données bancaires</li>
+            <li>Seules vos compétences et expériences professionnelles sont nécessaires</li>
+          </ul>
+        </p>
+      </div>
+      <div class="error-box" id="cv-error"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="btn-cv" onclick="submitCV()">Enregistrer mon profil</button>
+    </div>
+  </div>
+
+  <!-- STEP JOB -->
+  <div id="step-job" style="display:none">
+    <div class="success-card" id="profile-summary">Profil enregistré</div>
+    <div class="card">
+      <div class="card-label">Offre d'emploi à analyser</div>
+      <textarea id="job-input" placeholder="Collez le texte complet de l'offre d'emploi ici..." oninput="updateCount('job-input','job-count')"></textarea>
+      <div class="char-count" id="job-count">0 caractères</div>
+      <div class="error-box" id="job-error"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="btn-analyze" onclick="analyzeJob()">Analyser cette offre</button>
+      <button class="btn" onclick="resetCV()">Modifier mon profil</button>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading" id="step-loading">
+    <div class="loading-dots"><span></span><span></span><span></span></div>
+    <p id="loading-msg">Analyse en cours...</p>
+  </div>
+
+  <!-- RESULT -->
+  <div id="step-result" style="display:none">
+    <div class="metric-grid" id="metrics"></div>
+    <div id="result-content"></div>
+    <div class="btn-row" style="margin-top:1rem">
+      <button class="btn primary" onclick="analyzeAnother()">Analyser une autre offre</button>
+      <button class="btn" onclick="resetAll()">Recommencer</button>
+    </div>
+  </div>
+
+  <footer>Agent d'analyse d'offres — Portfolio project &bull; Powered by Claude API</footer>
+</div>
+
+<script>
+  const API_URL = 'http://localhost:3000/api';
+  const MODEL = 'claude-sonnet-4-5';
+  let cvText = '';
+
+  function updateCount(inputId, countId) {
+    document.getElementById(countId).textContent = document.getElementById(inputId).value.length + ' caractères';
+  }
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError(id) { document.getElementById(id).style.display = 'none'; }
+
+  function setStep(s) {
+    ['step-cv','step-job','step-loading','step-result'].forEach(id => {
+      document.getElementById(id).style.display = 'none';
+    });
+    const el = document.getElementById('step-' + s);
+    if (el) el.style.display = s === 'loading' ? 'block' : 'block';
+
+    const activeMap = { cv: 0, job: 1, loading: 1, result: 2 };
+    const doneUntil = { cv: -1, job: 0, loading: 0, result: 1 };
+    ['pill-0','pill-1','pill-2'].forEach((id, i) => {
+      const pill = document.getElementById(id);
+      pill.className = 'step-pill';
+      if (i <= doneUntil[s]) pill.classList.add('done');
+      else if (i === activeMap[s]) pill.classList.add('active');
+    });
+  }
+
+  async function callAPI(system, user) {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json' , 
+        'anthropic-version': '2023-06-01'},
+      body: JSON.stringify({ model: MODEL, max_tokens: 1000, system, messages: [{ role: 'user', content: user }] })
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || 'Erreur API ' + res.status); }
+    const data = await res.json();
+    if (!data || !data.content) throw new Error(JSON.stringify(data));
+    return data.content.map(i => i.text || '').join('').replace(/```json|```/g, '').trim();
+  }
+
+  async function submitCV() {
+    hideError('cv-error');
+    const cv = document.getElementById('cv-input').value.trim();
+    if (!cv) { showError('cv-error', 'Veuillez entrer votre profil avant de continuer.'); return; }
+    if (cv.length < 50) { showError('cv-error', 'Profil trop court — ajoutez plus de détails sur votre expérience.'); return; }
+    cvText = cv;
+    document.getElementById('btn-cv').disabled = true;
+    document.getElementById('loading-msg').textContent = 'Analyse de votre profil...';
+    setStep('loading');
+    try {
+      const json = await callAPI(
+        'You are a career assistant. Extract a profile summary in JSON only, no markdown:\n{"title":"current or target role max 5 words","years_exp":number,"summary":"one sentence max 15 words"}',
+        cv
+      );
+      const p = JSON.parse(json);
+      document.getElementById('profile-summary').textContent = 'Profil enregistré — ' + p.title + ' — ' + p.years_exp + ' ans d\'expérience';
+    } catch(e) {
+      document.getElementById('profile-summary').textContent = 'Profil enregistré';
+    }
+    setStep('job');
+  }
+
+  async function analyzeJob() {
+    hideError('job-error');
+    const job = document.getElementById('job-input').value.trim();
+    if (!job) { showError('job-error', 'Veuillez coller une offre d\'emploi avant de continuer.'); return; }
+    if (job.length < 100) { showError('job-error', 'L\'offre semble trop courte — collez le texte complet.'); return; }
+    document.getElementById('btn-analyze').disabled = true;
+    document.getElementById('loading-msg').textContent = 'Analyse de l\'offre en cours...';
+    setStep('loading');
+    try {
+      const json = await callAPI(
+        'You are an expert career coach. Analyze the match between a candidate and a job posting. JSON only, no markdown:\n{"score":number 0-100,"company":"name","role":"title max 5 words","strengths":["3 items max 8 words each"],"gaps":[{"demand":"max 6 words","candidate":"max 6 words"}],"keywords":["5 CV keywords"],"angle":"positioning sentence max 20 words","verdict":"honest assessment max 20 words"}',
+        'CANDIDATE:\n' + cvText + '\n\nJOB:\n' + job
+      );
+      renderResult(JSON.parse(json));
+      setStep('result');
+    } catch(e) {
+      setStep('job');
+      document.getElementById('btn-analyze').disabled = false;
+      showError('job-error', 'Erreur : ' + (e.message || 'Réessayez dans quelques secondes.'));
+    }
+  }
+
+  function renderResult(r) {
+    const score = Math.round(r.score);
+    const scoreColor = score >= 70 ? '#085041' : score >= 50 ? '#633806' : '#791f1f';
+    const scoreBg = score >= 70 ? '#e1f5ee' : score >= 50 ? '#faeeda' : '#fcebeb';
+    const scoreBorder = score >= 70 ? '#5dcaa5' : score >= 50 ? '#ef9f27' : '#f09595';
+    const scoreBar = score >= 70 ? '#1d9e75' : score >= 50 ? '#ba7517' : '#e24b4a';
+
+    document.getElementById('metrics').innerHTML =
+      '<div class="metric"><div class="metric-val" style="color:' + scoreColor + '">' + score + '/100</div><div class="metric-lbl">Score de match</div></div>' +
+      '<div class="metric"><div class="metric-val">' + (r.strengths||[]).length + '</div><div class="metric-lbl">Points forts</div></div>' +
+      '<div class="metric"><div class="metric-val">' + (r.gaps||[]).length + '</div><div class="metric-lbl">Gaps identifiés</div></div>';
+
+    let html = '<div class="card" style="background:' + scoreBg + ';border-color:' + scoreBorder + '">' +
+      '<div style="font-size:14px;font-weight:500;color:' + scoreColor + ';margin-bottom:6px">' + r.role + ' — ' + r.company + '</div>' +
+      '<div class="score-bar-wrap"><div class="score-bar" style="width:' + score + '%;background:' + scoreBar + '"></div></div>' +
+      '<div style="font-size:12px;color:' + scoreColor + '">' + r.verdict + '</div></div>';
+
+    html += '<div class="card">';
+    html += '<div class="section-title">Points forts</div>';
+    (r.strengths||[]).forEach(s => { html += '<span class="tag green">' + s + '</span>'; });
+
+    html += '<div class="section-title">Gaps à adresser</div>';
+    (r.gaps||[]).forEach(g => {
+      html += '<div class="gap-row"><span class="gap-label">' + g.demand + '</span><span class="tag amber">' + g.candidate + '</span></div>';
+    });
+
+    html += '<div class="section-title">Mots-clés à intégrer dans votre CV</div>';
+    (r.keywords||[]).forEach(k => { html += '<span class="tag purple">' + k + '</span>'; });
+
+    html += '<div class="section-title">Angle recommandé</div><p class="angle-text">' + r.angle + '</p></div>';
+    document.getElementById('result-content').innerHTML = html;
+  }
+
+  function analyzeAnother() {
+    document.getElementById('job-input').value = '';
+    document.getElementById('job-count').textContent = '0 caractères';
+    document.getElementById('btn-analyze').disabled = false;
+    hideError('job-error');
+    setStep('job');
+  }
+
+  function resetCV() {
+    document.getElementById('btn-cv').disabled = false;
+    hideError('cv-error');
+    setStep('cv');
+  }
+
+  function resetAll() {
+    cvText = '';
+    document.getElementById('cv-input').value = '';
+    document.getElementById('job-input').value = '';
+    document.getElementById('cv-count').textContent = '0 caractères';
+    document.getElementById('job-count').textContent = '0 caractères';
+    document.getElementById('btn-cv').disabled = false;
+    document.getElementById('btn-analyze').disabled = false;
+    hideError('cv-error');
+    hideError('job-error');
+    setStep('cv');
+  }
+
+  setStep('cv');
+</script>
+</body>
+</html>
