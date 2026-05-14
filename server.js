@@ -6,6 +6,11 @@ require('dotenv').config();
 const API_KEY = process.env.ANTHROPIC_API_KEY;
 const PORT = 3000;
 
+if (!API_KEY) {
+  console.error('Error: ANTHROPIC_API_KEY is not set. Add it to your .env file.');
+  process.exit(1);
+}
+
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
