@@ -119,7 +119,10 @@
     </div>
   </div>
 
-  <footer>Job analysis agent &bull; Portfolio project &bull; Powered by Claude API</footer>
+  <footer>
+    Job analysis agent &bull; Portfolio project &bull; Powered by Claude API
+    <div id="clear-profile-link" style="margin-top:6px;display:none"><a href="#" onclick="clearSavedProfile();return false;" style="color:#aaa89f;font-size:11px">Clear saved profile</a></div>
+  </footer>
 </div>
 
 <script>
@@ -168,6 +171,8 @@
     if (!cv) { showError('cv-error', 'Please enter your profile before continuing.'); return; }
     if (cv.length < 50) { showError('cv-error', 'Profile too short — please add more details about your experience.'); return; }
     cvText = cv;
+    localStorage.setItem('job_agent_cv', cv);
+    updateClearLink();
     document.getElementById('btn-cv').disabled = true;
     document.getElementById('loading-msg').textContent = 'Analyzing your profile...';
     setStep('loading');
@@ -374,7 +379,31 @@
     setStep('cv');
   }
 
-  setStep('cv');
+  function initFromStorage() {
+    const saved = localStorage.getItem('job_agent_cv');
+    if (saved && saved.length >= 50) {
+      cvText = saved;
+      document.getElementById('cv-input').value = saved;
+      updateCount('cv-input', 'cv-count');
+      document.getElementById('profile-summary').innerHTML = 'Profile loaded automatically — <a href="#" onclick="resetCV();return false;" style="color:#085041;text-decoration:underline;text-underline-offset:2px">Edit</a>';
+      setStep('job');
+    } else {
+      setStep('cv');
+    }
+    updateClearLink();
+  }
+
+  function updateClearLink() {
+    document.getElementById('clear-profile-link').style.display = localStorage.getItem('job_agent_cv') ? 'block' : 'none';
+  }
+
+  function clearSavedProfile() {
+    localStorage.removeItem('job_agent_cv');
+    updateClearLink();
+    resetAll();
+  }
+
+  initFromStorage();
 </script>
 </body>
 </html>
