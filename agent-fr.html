@@ -19,15 +19,18 @@
     textarea { width: 100%; min-height: 140px; font-size: 14px; padding: 10px 12px; border-radius: 8px; border: 0.5px solid #b4b2a9; background: #f9f9f7; color: #1a1a18; resize: vertical; font-family: inherit; line-height: 1.6; }
     textarea:focus { outline: none; border-color: #7f77dd; box-shadow: 0 0 0 2px #eeedfe; }
     .char-count { font-size: 11px; color: #888780; text-align: right; margin-top: 4px; }
-    .privacy-note { display: flex; align-items: flex-start; gap: 8px; background: #faeeda; border: 0.5px solid #ef9f27; border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
-    .privacy-note p { font-size: 12px; color: #633806; line-height: 1.6; }
-    .privacy-list { margin: 4px 0 0; padding-left: 16px; }
-    .privacy-list li { margin-bottom: 2px; }
+    .privacy-note { font-size: 11px; color: #BA7517; margin-top: 6px; }
     .error-box { background: #fcebeb; border: 0.5px solid #f09595; border-radius: 8px; padding: 10px 12px; margin-top: 10px; font-size: 13px; color: #791f1f; display: none; }
     .btn { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; padding: 9px 20px; border-radius: 8px; border: 0.5px solid #b4b2a9; background: transparent; color: #1a1a18; cursor: pointer; transition: background 0.15s; }
     .btn:hover { background: #f1efe8; }
     .btn.primary { background: #534ab7; color: #fff; border-color: #534ab7; }
     .btn.primary:hover { background: #3c3489; }
+    .btn.green { background: #1d9e75; color: #fff; border-color: #1d9e75; }
+    .btn.green:hover { background: #085041; }
+    .btn.amber-btn { background: #ba7517; color: #fff; border-color: #ba7517; }
+    .btn.amber-btn:hover { background: #633806; }
+    .btn.outline { border-color: #534ab7; color: #534ab7; }
+    .btn.outline:hover { background: #eeedfe; }
     .btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .success-card { background: #e1f5ee; border: 0.5px solid #5dcaa5; border-radius: 12px; padding: 12px 16px; margin-bottom: 1rem; font-size: 13px; color: #085041; }
@@ -53,6 +56,7 @@
     .gap-row:last-child { border-bottom: none; }
     .gap-label { color: #5f5e5a; flex: 1; }
     .angle-text { font-size: 13px; color: #5f5e5a; line-height: 1.6; margin: 0; }
+    .step6-loading { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #5f5e5a; padding: 10px 0; }
     footer { margin-top: 2rem; font-size: 12px; color: #888780; text-align: center; }
   </style>
 </head>
@@ -71,18 +75,9 @@
   <div id="step-cv">
     <div class="card">
       <div class="card-label">Votre profil professionnel</div>
-      <textarea id="cv-input" placeholder="Décrivez votre profil : expérience, compétences, formations, langues, ambitions de carrière..." oninput="updateCount('cv-input','cv-count')"></textarea>
+      <textarea id="cv-input" placeholder="Collez le contenu de votre CV ici — expérience, compétences, formations, langues..." oninput="updateCount('cv-input','cv-count')"></textarea>
       <div class="char-count" id="cv-count">0 caractères</div>
-      <div class="privacy-note">
-        <p>
-          <strong>Confidentialité</strong> — ne partagez pas d'informations personnelles sensibles :
-          <ul class="privacy-list">
-            <li>Pas de nom complet, adresse, téléphone ou email</li>
-            <li>Pas de numéro de sécurité sociale ou données bancaires</li>
-            <li>Seules vos compétences et expériences professionnelles sont nécessaires</li>
-          </ul>
-        </p>
-      </div>
+      <div class="privacy-note">Confidentialité — évitez de partager nom complet, adresse, téléphone, email, numéro de sécurité sociale ou données bancaires.</div>
       <div class="error-box" id="cv-error"></div>
     </div>
     <div class="btn-row">
@@ -115,8 +110,11 @@
   <div id="step-result" style="display:none">
     <div class="metric-grid" id="metrics"></div>
     <div id="result-content"></div>
+    <div id="step6-action" style="margin-top:1rem"></div>
+    <div id="step6-output"></div>
     <div class="btn-row" style="margin-top:1rem">
-      <button class="btn primary" onclick="analyzeAnother()">Analyser une autre offre</button>
+      <button class="btn primary" id="btn-reformuler" onclick="generateCV()" style="display:none">Reformuler mon CV pour ce poste</button>
+      <button class="btn outline" onclick="analyzeAnother()">Analyser une autre offre</button>
       <button class="btn" onclick="resetAll()">Recommencer</button>
     </div>
   </div>
@@ -128,6 +126,9 @@
   const API_URL = 'http://localhost:3000/api';
   const MODEL = 'claude-sonnet-4-5';
   let cvText = '';
+  let lastJobText = '';
+  let lastAnalysis = null;
+  let generatedCVText = '';
 
   function updateCount(inputId, countId) {
     document.getElementById(countId).textContent = document.getElementById(inputId).value.length + ' caractères';
@@ -146,7 +147,7 @@
       document.getElementById(id).style.display = 'none';
     });
     const el = document.getElementById('step-' + s);
-    if (el) el.style.display = s === 'loading' ? 'block' : 'block';
+    if (el) el.style.display = 'block';
 
     const activeMap = { cv: 0, job: 1, loading: 1, result: 2 };
     const doneUntil = { cv: -1, job: 0, loading: 0, result: 1 };
@@ -158,13 +159,15 @@
     });
   }
 
-  async function callAPI(system, user) {
+  async function callAPI(system, user, maxTokens) {
+    maxTokens = maxTokens || 1000;
     const res = await fetch(API_URL, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json' , 
-        'anthropic-version': '2023-06-01'},
-      body: JSON.stringify({ model: MODEL, max_tokens: 1000, system, messages: [{ role: 'user', content: user }] })
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] })
     });
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || 'Erreur API ' + res.status); }
     const data = await res.json();
@@ -199,6 +202,7 @@
     const job = document.getElementById('job-input').value.trim();
     if (!job) { showError('job-error', 'Veuillez coller une offre d\'emploi avant de continuer.'); return; }
     if (job.length < 100) { showError('job-error', 'L\'offre semble trop courte — collez le texte complet.'); return; }
+    lastJobText = job;
     document.getElementById('btn-analyze').disabled = true;
     document.getElementById('loading-msg').textContent = 'Analyse de l\'offre en cours...';
     setStep('loading');
@@ -217,6 +221,7 @@
   }
 
   function renderResult(r) {
+    lastAnalysis = r;
     const score = Math.round(r.score);
     const scoreColor = score >= 70 ? '#085041' : score >= 50 ? '#633806' : '#791f1f';
     const scoreBg = score >= 70 ? '#e1f5ee' : score >= 50 ? '#faeeda' : '#fcebeb';
@@ -247,12 +252,118 @@
 
     html += '<div class="section-title">Angle recommandé</div><p class="angle-text">' + r.angle + '</p></div>';
     document.getElementById('result-content').innerHTML = html;
+    document.getElementById('btn-reformuler').style.display = score >= 70 ? 'inline-flex' : 'none';
+
+    renderStep6(score);
+  }
+
+  function renderStep6(score) {
+    const action = document.getElementById('step6-action');
+    document.getElementById('step6-output').innerHTML = '';
+
+    if (score >= 70) {
+      action.innerHTML = '';
+    } else if (score >= 50) {
+      action.innerHTML = '<div class="btn-row"><button class="btn amber-btn" onclick="improveProfile()">Comment améliorer mon profil</button></div>';
+    } else {
+      action.innerHTML = '<div class="step6-loading"><div class="loading-dots"><span></span><span></span><span></span></div><span>Analyse des rôles adaptés à votre profil...</span></div>';
+      callAPI(
+        'You are a career coach. Given the mismatch between the candidate and this role, briefly explain why it\'s not a fit and suggest 3 specific roles that would better suit the candidate\'s actual profile. JSON only, no markdown:\n{"mismatch_reason":"one sentence max 20 words","better_roles":["role 1","role 2","role 3"],"transferable":"one key transferable strength max 15 words"}',
+        'CANDIDATE:\n' + cvText + '\n\nJOB APPLIED TO:\n' + lastJobText
+      ).then(json => {
+        try {
+          const d = JSON.parse(json);
+          let html = '<div class="card" style="background:#fcebeb;border-color:#f09595;margin-top:0">';
+          html += '<div style="font-size:13px;font-weight:500;color:#791f1f;margin-bottom:8px">Profil peu adapté à ce poste</div>';
+          html += '<p class="angle-text" style="color:#791f1f;margin-bottom:2px">' + d.mismatch_reason + '</p>';
+          html += '<div class="section-title">Rôles mieux adaptés à votre profil</div>';
+          (d.better_roles||[]).forEach(role => { html += '<span class="tag" style="background:#f5e6e6;color:#791f1f">' + role + '</span>'; });
+          html += '<div class="section-title">Atout transférable</div><p class="angle-text">' + d.transferable + '</p>';
+          html += '</div>';
+          action.innerHTML = '';
+          document.getElementById('step6-output').innerHTML = html;
+        } catch(e) { action.innerHTML = ''; }
+      }).catch(() => { action.innerHTML = ''; });
+    }
+  }
+
+  async function generateCV() {
+    const btn = document.getElementById('btn-reformuler');
+    btn.disabled = true;
+    btn.textContent = 'Reformulation en cours...';
+    try {
+      const text = await callAPI(
+        'You are an expert CV writer. Rewrite the candidate\'s existing experience to better match the job posting, using the job\'s keywords and priorities. Do not invent anything new — keep the same facts, rephrase and reorder to highlight relevance. Return 2-3 sections. JSON only, no markdown:\n{"sections":[{"title":"string","content":"string, use \\n for line breaks between bullet points"}]}',
+        'CANDIDATE CV:\n' + cvText + '\n\nJOB POSTING:\n' + lastJobText,
+        1500
+      );
+      const d = JSON.parse(text);
+      let plain = '';
+      let html = '<div class="card" style="background:#e1f5ee;border-color:#5dcaa5;margin-top:0">';
+      html += '<div style="font-size:13px;font-weight:500;color:#085041;margin-bottom:10px">CV reformulé pour ce poste</div>';
+      (d.sections||[]).forEach(s => {
+        html += '<div class="section-title" style="color:#085041">' + s.title + '</div>';
+        html += '<p class="angle-text" style="white-space:pre-line">' + s.content + '</p>';
+        plain += s.title + '\n' + s.content + '\n\n';
+      });
+      html += '<div style="margin-top:14px;padding-top:10px;border-top:0.5px solid #a8dcc8;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">';
+      html += '<p style="font-size:11px;color:#5f5e5a;line-height:1.5">Les langues et la formation ont été conservées telles quelles — seules les expériences ont été reformulées selon les priorités de l\'offre.</p>';
+      html += '<button class="btn" style="font-size:12px;padding:6px 14px;flex-shrink:0" onclick="copyCV()">Copier</button>';
+      html += '</div></div>';
+      generatedCVText = plain.trim();
+      document.getElementById('step6-output').innerHTML = html;
+      btn.disabled = false;
+      btn.textContent = 'Reformuler mon CV pour ce poste';
+    } catch(e) {
+      btn.disabled = false;
+      btn.textContent = 'Reformuler mon CV pour ce poste';
+      document.getElementById('step6-output').innerHTML = '<div class="error-box" style="display:block">Erreur — réessayez dans quelques secondes.</div>';
+    }
+  }
+
+  function copyCV() {
+    navigator.clipboard.writeText(generatedCVText).then(() => {
+      const btn = document.querySelector('#step6-output .btn');
+      if (btn) { const orig = btn.textContent; btn.textContent = 'Copié !'; setTimeout(() => { btn.textContent = orig; }, 2000); }
+    }).catch(() => {});
+  }
+
+  async function improveProfile() {
+    const btn = document.querySelector('#step6-action .btn.amber-btn');
+    btn.disabled = true;
+    btn.textContent = 'Analyse en cours...';
+    try {
+      const text = await callAPI(
+        'You are an expert career coach. Based on the gaps between the candidate and this role, give specific actionable suggestions to bridge them. JSON only, no markdown:\n{"suggestions":[{"gap":"max 6 words","action":"concrete step max 15 words","timeline":"e.g. 1 mois"}],"quick_wins":["max 10 words each, 3 items"]}',
+        'PROFIL CANDIDAT:\n' + cvText + '\n\nOFFRE D\'EMPLOI:\n' + lastJobText + '\n\nGAPS IDENTIFIÉS:\n' + JSON.stringify(lastAnalysis.gaps),
+        1200
+      );
+      const d = JSON.parse(text);
+      let html = '<div class="card" style="background:#faeeda;border-color:#ef9f27;margin-top:0">';
+      html += '<div style="font-size:13px;font-weight:500;color:#633806;margin-bottom:10px">Plan d\'amélioration</div>';
+      html += '<div class="section-title">Actions concrètes</div>';
+      (d.suggestions||[]).forEach(s => {
+        html += '<div class="gap-row"><span class="gap-label">' + s.gap + '</span><span style="font-size:12px;color:#633806;text-align:right;max-width:60%">' + s.action + ' <em style="opacity:0.7">(' + s.timeline + ')</em></span></div>';
+      });
+      html += '<div class="section-title">Victoires rapides</div>';
+      (d.quick_wins||[]).forEach(w => { html += '<span class="tag amber">' + w + '</span>'; });
+      html += '</div>';
+      document.getElementById('step6-action').innerHTML = '';
+      document.getElementById('step6-output').innerHTML = html;
+    } catch(e) {
+      btn.disabled = false;
+      btn.textContent = 'Comment améliorer mon profil';
+      document.getElementById('step6-output').innerHTML = '<div class="error-box" style="display:block">Erreur — réessayez dans quelques secondes.</div>';
+    }
   }
 
   function analyzeAnother() {
     document.getElementById('job-input').value = '';
     document.getElementById('job-count').textContent = '0 caractères';
     document.getElementById('btn-analyze').disabled = false;
+    document.getElementById('btn-reformuler').style.display = 'none';
+    document.getElementById('step6-action').innerHTML = '';
+    document.getElementById('step6-output').innerHTML = '';
     hideError('job-error');
     setStep('job');
   }
@@ -265,12 +376,17 @@
 
   function resetAll() {
     cvText = '';
+    lastJobText = '';
+    lastAnalysis = null;
     document.getElementById('cv-input').value = '';
     document.getElementById('job-input').value = '';
     document.getElementById('cv-count').textContent = '0 caractères';
     document.getElementById('job-count').textContent = '0 caractères';
     document.getElementById('btn-cv').disabled = false;
     document.getElementById('btn-analyze').disabled = false;
+    document.getElementById('btn-reformuler').style.display = 'none';
+    document.getElementById('step6-action').innerHTML = '';
+    document.getElementById('step6-output').innerHTML = '';
     hideError('cv-error');
     hideError('job-error');
     setStep('cv');
