@@ -23,6 +23,17 @@ function extractText(html) {
     .slice(0, 15000);
 }
 
+function cleanJobText(text) {
+  const noisePattern = /\b(cookies?|privacy policy|accept all|reject all|consent|gdpr|necessary cookies?|third[- ]party cookies?|opt[- ]out|opt[- ]in|we use cookies|this site uses cookies?|your privacy|privacy settings|cookie settings|cookie preferences|personalized ads|legitimate interest|manage preferences|advertising partners|data protection)\b/i;
+
+  return text
+    .split(/\.\s+/)
+    .filter(s => !(noisePattern.test(s) && s.trim().length < 350))
+    .join('. ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -83,7 +94,7 @@ const server = http.createServer(async (req, res) => {
       });
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const html = await response.text();
-      const text = extractText(html);
+      const text = cleanJobText(extractText(html));
       if (text.length < 50) throw new Error('Could not extract readable content from this page');
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ text }));
