@@ -320,16 +320,16 @@
       );
       const d = JSON.parse(text);
       let plain = '';
-      let html = '<div class="card" style="background:#e1f5ee;border-color:#5dcaa5;margin-top:0">';
-      html += '<div style="font-size:13px;font-weight:500;color:#085041;margin-bottom:10px">CV rewritten for this role</div>';
+      let html = '<div class="card" style="background:#e1f5ee;border-color:#5dcaa5;margin-top:0;position:relative">';
+      html += '<button id="copy-cv-btn" onclick="copyCV()" title="Copy" style="position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;border-radius:4px;color:#085041;transition:opacity 0.15s" onmouseover="this.style.opacity=\'0.6\'" onmouseout="this.style.opacity=\'1\'">📋</button>';
+      html += '<div style="font-size:13px;font-weight:500;color:#085041;margin-bottom:10px;padding-right:28px">CV rewritten for this role</div>';
       (d.sections||[]).forEach(s => {
         html += '<div class="section-title" style="color:#085041">' + s.title + '</div>';
         html += '<p class="angle-text" style="white-space:pre-line">' + s.content + '</p>';
         plain += s.title + '\n' + s.content + '\n\n';
       });
-      html += '<div style="margin-top:14px;padding-top:10px;border-top:0.5px solid #a8dcc8;display:flex;align-items:flex-start;justify-content:space-between;gap:12px">';
+      html += '<div style="margin-top:14px;padding-top:10px;border-top:0.5px solid #a8dcc8">';
       html += '<p style="font-size:11px;color:#5f5e5a;line-height:1.5">Languages and education were kept as-is — only the experience sections were rewritten to match the role\'s priorities.</p>';
-      html += '<button class="btn" style="font-size:12px;padding:6px 14px;flex-shrink:0" onclick="copyCV()">Copy</button>';
       html += '</div></div>';
       generatedCVText = plain.trim();
       document.getElementById('step6-output').innerHTML = html;
@@ -344,8 +344,8 @@
 
   function copyCV() {
     navigator.clipboard.writeText(generatedCVText).then(() => {
-      const btn = document.querySelector('#step6-output .btn');
-      if (btn) { const orig = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = orig; }, 2000); }
+      const btn = document.getElementById('copy-cv-btn');
+      if (btn) { btn.textContent = '✓'; setTimeout(() => { btn.textContent = '📋'; }, 2000); }
     }).catch(() => {});
   }
 
