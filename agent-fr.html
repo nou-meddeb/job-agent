@@ -57,6 +57,8 @@
     .gap-label { color: #5f5e5a; flex: 1; }
     .angle-text { font-size: 13px; color: #5f5e5a; line-height: 1.6; margin: 0; }
     .step6-loading { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #5f5e5a; padding: 10px 0; }
+    .url-input { font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 0.5px solid #b4b2a9; background: #f9f9f7; color: #1a1a18; font-family: inherit; flex: 1; min-width: 0; }
+    .url-input:focus { outline: none; border-color: #7f77dd; box-shadow: 0 0 0 2px #eeedfe; }
     footer { margin-top: 2rem; font-size: 12px; color: #888780; text-align: center; }
   </style>
 </head>
@@ -90,6 +92,10 @@
     <div class="success-card" id="profile-summary">Profil enregistré</div>
     <div class="card">
       <div class="card-label">Offre d'emploi à analyser</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="url" id="job-url" class="url-input" placeholder="Ou collez l'URL de l'offre ici" />
+        <button class="btn" id="btn-load-url" onclick="loadFromURL()" style="font-size:13px;padding:8px 14px;flex-shrink:0">Charger</button>
+      </div>
       <textarea id="job-input" placeholder="Collez le texte complet de l'offre d'emploi ici..." oninput="updateCount('job-input','job-count')"></textarea>
       <div class="char-count" id="job-count">0 caractères</div>
       <div class="error-box" id="job-error"></div>
@@ -200,6 +206,29 @@
       document.getElementById('profile-summary').textContent = 'Profil enregistré';
     }
     setStep('job');
+  }
+
+  async function loadFromURL() {
+    const urlInput = document.getElementById('job-url');
+    const url = urlInput.value.trim();
+    if (!url) return;
+    const btn = document.getElementById('btn-load-url');
+    btn.disabled = true;
+    btn.textContent = 'Chargement...';
+    hideError('job-error');
+    try {
+      const res = await fetch(API_URL.replace('/api', '/fetch-job') + '?url=' + encodeURIComponent(url));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur ' + res.status);
+      document.getElementById('job-input').value = data.text;
+      updateCount('job-input', 'job-count');
+      urlInput.value = '';
+    } catch(e) {
+      showError('job-error', 'Impossible de charger l\'URL — ' + (e.message || 'réessayez.'));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Charger';
+    }
   }
 
   async function analyzeJob() {
