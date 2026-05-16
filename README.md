@@ -43,6 +43,20 @@ Output — Structured report per offer
 2. Add your Anthropic API key to the `callAPI` function (replace the fetch headers with your key).
 3. Run locally or deploy to GitHub Pages / Vercel.
 
+### Current features
+- Automatic job search via Arbeitnow API with keyword and location filtering
+- CV profile saved in localStorage (persists across sessions)
+- Job offer input via URL fetch or manual paste
+- Match score (0–100), strengths, gaps, and keywords analysis
+- CV rewrite tailored to the specific job offer
+
+### Known limitations & next steps
+- Job search relies on the free Arbeitnow API — limited precision, results skewed toward Germany-based jobs
+- **Next**: integrate a paid API for LinkedIn/Indeed results
+- **Next**: user accounts with persistent database storage
+- **Next**: downloadable `.docx` CV export
+- **Next**: online deployment (currently local only)
+
 ### Tech stack
 - Vanilla HTML, CSS, JavaScript (no framework)
 - Claude API — `claude-sonnet-4-20250514`
@@ -92,6 +106,20 @@ Output — Rapport structuré par poste
 1. Ouvrez `agent-fr.html` ou `agent-en.html` dans un navigateur.
 2. Ajoutez votre clé API Anthropic dans la fonction `callAPI`.
 3. Lancez en local ou déployez sur GitHub Pages / Vercel.
+
+### Fonctionnalités actuelles
+- Recherche automatique d'offres via l'API Arbeitnow avec filtrage par mots-clés et localisation
+- Profil CV sauvegardé dans le localStorage (persistant entre les sessions)
+- Saisie de l'offre d'emploi via URL ou collage manuel
+- Score de match (0–100), points forts, gaps et analyse des mots-clés
+- Réécriture du CV adaptée à l'offre ciblée
+
+### Limitations connues & prochaines étapes
+- La recherche d'offres utilise l'API gratuite Arbeitnow — précision limitée, résultats principalement axés sur l'Allemagne
+- **Prochaine étape** : intégrer une API payante pour les résultats LinkedIn/Indeed
+- **Prochaine étape** : comptes utilisateurs avec base de données persistante
+- **Prochaine étape** : export du CV en `.docx` téléchargeable
+- **Prochaine étape** : déploiement en ligne (actuellement en local uniquement)
 
 ### Stack technique
 - HTML, CSS, JavaScript vanille (sans framework)
