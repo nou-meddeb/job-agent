@@ -81,6 +81,46 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && req.url.startsWith('/search-jobs')) {
+    const searchParams = new URL(req.url, 'http://localhost').searchParams;
+    const q = searchParams.get('q');
+    const location = searchParams.get('location') || '';
+    if (!q) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Missing q parameter' }));
+      return;
+    }
+    try {
+      let apiUrl = 'https://www.arbeitnow.com/api/job-board-api?search=' + encodeURIComponent(q);
+      if (location) apiUrl += '&location=' + encodeURIComponent(location);
+      const response = await fetch(apiUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      const keywords = q.toLowerCase().split(' ');
+      const filtered = data.data.filter(job =>
+  keywords.some(keyword =>
+    job.title.toLowerCase().includes(keyword)
+  )
+      );
+      const jobs = (filtered || []).slice(0, 8).map(j => ({
+        title: j.title,
+        company_name: j.company_name,
+        url: j.url,
+        location: j.location || '',
+        remote: !!j.remote,
+        description: (j.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300)
+      }));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ jobs }));
+    } catch(e) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   if (req.method === 'GET' && req.url.startsWith('/fetch-job')) {
     const targetUrl = new URL(req.url, 'http://localhost').searchParams.get('url');
     if (!targetUrl) {

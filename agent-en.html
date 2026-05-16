@@ -59,6 +59,10 @@
     .step6-loading { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #5f5e5a; padding: 10px 0; }
     .url-input { font-size: 13px; padding: 8px 10px; border-radius: 8px; border: 0.5px solid #b4b2a9; background: #f9f9f7; color: #1a1a18; font-family: inherit; flex: 1; min-width: 0; }
     .url-input:focus { outline: none; border-color: #7f77dd; box-shadow: 0 0 0 2px #eeedfe; }
+    .job-card { background: #f9f9f7; border: 0.5px solid #d3d1c7; border-radius: 8px; padding: 10px 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .job-card-info { flex: 1; min-width: 0; }
+    .job-card-title { font-size: 13px; font-weight: 500; color: #1a1a18; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .job-card-company { font-size: 12px; color: #5f5e5a; margin-top: 2px; }
     footer { margin-top: 2rem; font-size: 12px; color: #888780; text-align: center; }
   </style>
 </head>
@@ -68,13 +72,32 @@
   <p class="subtitle">Match job offers against your professional profile.</p>
 
   <div class="step-indicator">
-    <span class="step-pill active" id="pill-0">Step 0 — Profile</span>
+    <span class="step-pill active" id="pill-search">Automatic Search</span>
+    <span class="step-pill" id="pill-0">Step 0 — Profile</span>
     <span class="step-pill" id="pill-1">Step 4 — Analysis</span>
     <span class="step-pill" id="pill-2">Result</span>
   </div>
 
+  <!-- STEP SEARCH -->
+  <div id="step-search">
+    <div class="card">
+      <div class="card-label">Search for jobs by keyword</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <input type="text" id="search-input" class="url-input" placeholder="e.g. Python developer, project manager, UX designer..." onkeydown="if(event.key==='Enter')searchJobs()" />
+        <input type="text" id="location-input" class="url-input" placeholder="Berlin, Munich..." onkeydown="if(event.key==='Enter')searchJobs()" style="max-width:160px" />
+        <button class="btn primary" id="btn-search" onclick="searchJobs()" style="flex-shrink:0">Search jobs</button>
+      </div>
+      <div class="error-box" id="search-error"></div>
+      <div id="search-count" style="font-size:12px;color:#5f5e5a;margin-bottom:8px;display:none"></div>
+      <div id="search-results"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" onclick="skipSearch()">Enter a job offer manually →</button>
+    </div>
+  </div>
+
   <!-- STEP CV -->
-  <div id="step-cv">
+  <div id="step-cv" style="display:none">
     <div class="card">
       <div class="card-label">Your professional profile</div>
       <textarea id="cv-input" placeholder="Paste your CV content here — experience, skills, education, languages..." oninput="updateCount('cv-input','cv-count')"></textarea>
@@ -138,6 +161,8 @@
   let lastJobText = '';
   let lastAnalysis = null;
   let generatedCVText = '';
+  let pendingJobText = '';
+  let _searchResults = [];
 
   function updateCount(inputId, countId) {
     document.getElementById(countId).textContent = document.getElementById(inputId).value.length + ' characters';
@@ -147,16 +172,106 @@
   function hideError(id) { document.getElementById(id).style.display = 'none'; }
 
   function setStep(s) {
-    ['step-cv','step-job','step-loading','step-result'].forEach(id => { document.getElementById(id).style.display = 'none'; });
-    document.getElementById('step-' + s).style.display = 'block';
-    const activeMap = { cv: 0, job: 1, loading: 1, result: 2 };
-    const doneUntil = { cv: -1, job: 0, loading: 0, result: 1 };
-    ['pill-0','pill-1','pill-2'].forEach((id, i) => {
+    ['step-search','step-cv','step-job','step-loading','step-result'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    const el = document.getElementById('step-' + s);
+    if (el) el.style.display = 'block';
+    const activeMap = { search: 0, cv: 1, job: 2, loading: 2, result: 3 };
+    const doneUntil = { search: -1, cv: 0, job: 1, loading: 1, result: 2 };
+    ['pill-search','pill-0','pill-1','pill-2'].forEach((id, i) => {
       const pill = document.getElementById(id);
+      if (!pill) return;
       pill.className = 'step-pill';
       if (i <= doneUntil[s]) pill.classList.add('done');
       else if (i === activeMap[s]) pill.classList.add('active');
     });
+  }
+
+  async function searchJobs() {
+    const q = document.getElementById('search-input').value.trim();
+    if (!q) return;
+    const btn = document.getElementById('btn-search');
+    btn.disabled = true;
+    btn.textContent = 'Searching...';
+    hideError('search-error');
+    document.getElementById('search-results').innerHTML = '';
+    document.getElementById('search-count').style.display = 'none';
+    try {
+      const loc = document.getElementById('location-input').value.trim();
+      const qs = 'http://localhost:3000/search-jobs?q=' + encodeURIComponent(q) + (loc ? '&location=' + encodeURIComponent(loc) : '');
+      const res = await fetch(qs);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error ' + res.status);
+      if (!data.jobs || data.jobs.length === 0) {
+        showError('search-error', 'No results found. Try different keywords.');
+      } else {
+        _searchResults = data.jobs;
+        renderSearchResults(data.jobs);
+      }
+    } catch(e) {
+      showError('search-error', 'Search error — ' + (e.message || 'please try again.'));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Search jobs';
+    }
+  }
+
+  function renderSearchResults(jobs) {
+    const count = document.getElementById('search-count');
+    count.textContent = jobs.length + ' result' + (jobs.length > 1 ? 's' : '') + ' found';
+    count.style.display = 'block';
+    const container = document.getElementById('search-results');
+    container.innerHTML = '';
+    jobs.forEach((job, i) => {
+      const div = document.createElement('div');
+      div.className = 'job-card';
+      const remoteBadge = job.remote
+        ? '<span style="background:#e1f5ee;color:#085041;font-size:11px;padding:1px 6px;border-radius:10px;margin-left:4px">Remote</span>'
+        : '<span style="background:#f1efe8;color:#888780;font-size:11px;padding:1px 6px;border-radius:10px;margin-left:4px">On-site</span>';
+      const locationPart = job.location ? ' · ' + escapeHtml(job.location) : '';
+      div.innerHTML =
+        '<div class="job-card-info">' +
+          '<div class="job-card-title">' + escapeHtml(job.title) + '</div>' +
+          '<div class="job-card-company">' + escapeHtml(job.company_name) + locationPart + remoteBadge + '</div>' +
+        '</div>' +
+        '<button class="btn primary" style="font-size:12px;padding:7px 14px;flex-shrink:0;align-self:flex-start" onclick="selectJob(' + i + ')">Analyze this role</button>';
+      container.appendChild(div);
+    });
+  }
+
+  function escapeHtml(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  async function selectJob(idx) {
+    const job = _searchResults[idx];
+    const btns = document.querySelectorAll('#search-results .btn.primary');
+    const btn = btns[idx];
+    if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+
+    let jobText = '';
+    try {
+      const res = await fetch('http://localhost:3000/fetch-job?url=' + encodeURIComponent(job.url));
+      const data = await res.json();
+      if (res.ok && data.text && data.text.length >= 100) jobText = data.text;
+    } catch(e) {}
+
+    if (!jobText) jobText = job.title + ' — ' + job.company_name + '\n\n' + job.description;
+
+    if (cvText) {
+      document.getElementById('job-input').value = jobText;
+      updateCount('job-input', 'job-count');
+      analyzeJob();
+    } else {
+      pendingJobText = jobText;
+      setStep('cv');
+    }
+  }
+
+  function skipSearch() {
+    setStep(cvText ? 'job' : 'cv');
   }
 
   async function callAPI(system, user, maxTokens) {
@@ -192,7 +307,14 @@
     } catch(e) {
       document.getElementById('profile-summary').textContent = 'Profile saved';
     }
-    setStep('job');
+    if (pendingJobText) {
+      document.getElementById('job-input').value = pendingJobText;
+      updateCount('job-input', 'job-count');
+      pendingJobText = '';
+      analyzeJob();
+    } else {
+      setStep('job');
+    }
   }
 
   async function loadFromURL() {
@@ -386,7 +508,7 @@
     document.getElementById('step6-action').innerHTML = '';
     document.getElementById('step6-output').innerHTML = '';
     hideError('job-error');
-    setStep('job');
+    setStep('search');
   }
 
   function resetCV() { document.getElementById('btn-cv').disabled = false; hideError('cv-error'); setStep('cv'); }
@@ -395,17 +517,22 @@
     cvText = '';
     lastJobText = '';
     lastAnalysis = null;
+    pendingJobText = '';
+    _searchResults = [];
     document.getElementById('cv-input').value = '';
     document.getElementById('job-input').value = '';
     document.getElementById('cv-count').textContent = '0 characters';
     document.getElementById('job-count').textContent = '0 characters';
+    document.getElementById('search-input').value = '';
+    document.getElementById('search-results').innerHTML = '';
+    document.getElementById('search-count').style.display = 'none';
     document.getElementById('btn-cv').disabled = false;
     document.getElementById('btn-analyze').disabled = false;
     document.getElementById('btn-reformuler').style.display = 'none';
     document.getElementById('step6-action').innerHTML = '';
     document.getElementById('step6-output').innerHTML = '';
-    hideError('cv-error'); hideError('job-error');
-    setStep('cv');
+    hideError('cv-error'); hideError('job-error'); hideError('search-error');
+    setStep('search');
   }
 
   function initFromStorage() {
@@ -415,11 +542,9 @@
       document.getElementById('cv-input').value = saved;
       updateCount('cv-input', 'cv-count');
       document.getElementById('profile-summary').innerHTML = 'Profile loaded automatically — <a href="#" onclick="resetCV();return false;" style="color:#085041;text-decoration:underline;text-underline-offset:2px">Edit</a>';
-      setStep('job');
-    } else {
-      setStep('cv');
     }
     updateClearLink();
+    setStep('search');
   }
 
   function updateClearLink() {
